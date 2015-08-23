@@ -1,0 +1,100 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../iron-ajax/iron-ajax.html">
+
+<dom-module id="hostperson-element">
+    <template>
+      <iron-ajax id="checkExist" 
+        handle-as="json"
+        on-response="_handleCheckExist">
+      </iron-ajax>
+      <iron-ajax id="insertAjax" 
+        handle-as="json"
+        method="POST"
+        content-type="application/json"
+        on-response="_handleAjaxInsert">
+      </iron-ajax>
+      <iron-ajax id="updateAjax" 
+        handle-as="json"
+        method="PUT"
+        content-type="application/json"
+        on-response="_handleAjaxUpdate">
+      </iron-ajax>
+    </template>
+</dom-module>
+
+<script>
+  Polymer({
+    is: 'hostperson-element',
+    properties: {
+      id: String,
+      hostID: String,
+      personID: String,
+    },
+    ready: function() {
+
+    },
+	echo: function(text){
+		return "hello " + text;
+	},
+  	checkExist: function(hostID, personID){
+  	  if(hostID && personID){
+  	    var where = {"where":{"and":[{"HostID":hostID},{"PersonID":personID},{"EndDate":null}]}};
+  	  }
+  	  else if(hostID){
+  	    var where = {"where":{"and":[{"HostID":hostID},{"EndDate":null}]}};
+  	  }
+  	  else if(personID){
+  	    var where = {"where":{"and":[{"PersonID":personID},{"EndDate":null}]}};
+  	  }
+  	  this.personID = personID;
+  	  this.hostID = hostID;
+  	  this.$.checkExist.url = "/api/HostPeople/?filter=" + encodeURI(JSON.stringify(where));
+      this.$.checkExist.generateRequest();
+  	},
+  	_handleCheckExist: function(){
+  	  var response = this.$.checkExist.lastResponse;
+  	  var _id = null;
+  	  if(response.length > 0){
+  	    _id = response[0].id;
+  	  }
+  	  if(_id){
+  	    this.fire('hostperson-success', {'event':'checkExist','id':_id,'PersonID':this.personID,'HostID':this.hostID});
+  	  }
+  	  else{
+  	    this.fire('hostperson-success', {'event':'checkExist','id':null,'PersonID':this.personID,'HostID':this.hostID});
+  	  }
+  	},
+  	insert: function(hostID, personID, personType, startDate){
+  	  this.$.insertAjax.url = "/api/HostPeople";
+      this.$.insertAjax.body = JSON.stringify({
+        "HostID": hostID,
+        "PersonID": personID,
+        "PersonType": personType,
+        "StartDate": startDate,
+        "EndDate": null
+      });
+      this.personID = personID;
+  	  this.hostID = hostID;
+  	  this.$.insertAjax.generateRequest();
+  	},
+  	_handleAjaxInsert: function(){
+  	  var _id = this.$.insertAjax.lastResponse.id;
+  	  this.fire('hostperson-success', {'event':'insert','id':_id,'PersonID':this.personID,'HostID':this.hostID});
+  	},
+  	update: function(id, value){
+  	  var body = JSON.stringify({
+        "EndDate": new Date()
+      });
+      if(value){
+        body = JSON.stringify(value);
+      }
+  	  this.$.updateAjax.url = "/api/HostPeople/" + id;
+  	  this.$.updateAjax.body = body;
+  	  this.id = id;
+  	  this.$.updateAjax.generateRequest();
+  	},
+  	_handleAjaxUpdate: function(){
+  	  this.fire('hostperson-success', {'event':'update','id':this.id,'PersonID':this.personID,'HostID':this.hostID});
+  	}
+  });
+</script>
