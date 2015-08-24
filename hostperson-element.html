@@ -3,7 +3,17 @@
 
 <dom-module id="hostperson-element">
     <template>
-      <iron-ajax id="checkExist" 
+	  <iron-ajax id="groupExist" 
+        handle-as="json"
+        on-response="_handleGroupExist">
+      </iron-ajax>
+	  <iron-ajax id="insertGroup" 
+        handle-as="json"
+        method="POST"
+        content-type="application/json"
+        on-response="_handleInsertGroup">
+      </iron-ajax>
+      <iron-ajax id="checkExistAjax" 
         handle-as="json"
         on-response="_handleCheckExist">
       </iron-ajax>
@@ -27,60 +37,117 @@
     is: 'hostperson-element',
     properties: {
       id: String,
-      hostID: String,
+      hostID: {
+		type: String,
+		observer: '_hostIDChanged'
+	  },
       personID: String,
+	  personType: String,
+	  startDate: Date,
+	  relationType: {
+		type: String,
+		value: "personInHost"
+	  },
+	  relationDesc: {
+		type: String,
+		value: "คนที่อยู่ใน Host"
+	  },
+	  isGroupExist: Boolean,
+	  groupID: String
     },
     ready: function() {
-
-    },
+		this.hostID = "55d4430f8a8d844c1f98f64c";
+    },	
 	echo: function(text){
 		return "hello " + text;
 	},
-  	checkExist: function(hostID, personID){
-  	  if(hostID && personID){
-  	    var where = {"where":{"and":[{"HostID":hostID},{"PersonID":personID},{"EndDate":null}]}};
-  	  }
-  	  else if(hostID){
-  	    var where = {"where":{"and":[{"HostID":hostID},{"EndDate":null}]}};
-  	  }
-  	  else if(personID){
-  	    var where = {"where":{"and":[{"PersonID":personID},{"EndDate":null}]}};
-  	  }
-  	  this.personID = personID;
-  	  this.hostID = hostID;
-  	  this.$.checkExist.url = "/api/HostPeople/?filter=" + encodeURI(JSON.stringify(where));
-      this.$.checkExist.generateRequest();
+	_hostIDChanged: function(){	
+		this._groupExist();
+	},
+	_groupExist: function(){		
+		var where = {"where":{"and":[{"HostID":this.hostID},{"relationType":this.relationType}]},"fields":["id"]};
+		this.$.groupExist.url = "/api/Groups/?filter=" + encodeURI(JSON.stringify(where));		
+		this.$.groupExist.generateRequest();
+	},
+	_handleGroupExist: function(){
+		var response = this.$.groupExist.lastResponse;
+		this.isGroupExist = false;
+		if(response){
+			if(response.length > 0){
+				this.groupID = response[0].id;
+				this.isGroupExist = true;
+			}
+		}
+	},
+  	checkExist: function(personID){
+		this.personID = personID;
+		if(!this.isGroupExist){
+			this._handleCheckExist();
+			return;
+		}
+		var where = {"where":{"and":[{"GroupID":this.groupID},{"EndDate":null},{"RelatedID":personID}]}};
+		this.$.checkExistAjax.url = "/api/GroupDetails/?filter=" + encodeURI(JSON.stringify(where));
+		this.$.checkExistAjax.generateRequest();
   	},
   	_handleCheckExist: function(){
-  	  var response = this.$.checkExist.lastResponse;
-  	  var _id = null;
-  	  if(response.length > 0){
-  	    _id = response[0].id;
-  	  }
-  	  if(_id){
-  	    this.fire('hostperson-success', {'event':'checkExist','id':_id,'PersonID':this.personID,'HostID':this.hostID});
-  	  }
-  	  else{
-  	    this.fire('hostperson-success', {'event':'checkExist','id':null,'PersonID':this.personID,'HostID':this.hostID});
-  	  }
+		if(!this.isGroupExist){
+			this.fire('hostperson-success', {'event':'checkExist','id':null,'PersonID':this.personID,'HostID':this.hostID});
+			return;
+		}
+		var response = this.$.checkExistAjax.lastResponse;
+		var _id = null;
+		if(response.length > 0){
+			_id = response[0].id;
+		}
+		if(_id){
+			this.fire('hostperson-success', {'event':'checkExist','id':_id,'PersonID':this.personID,'HostID':this.hostID});
+		}
+		else{
+			this.fire('hostperson-success', {'event':'checkExist','id':null,'PersonID':this.personID,'HostID':this.hostID});
+		}
   	},
-  	insert: function(hostID, personID, personType, startDate){
-  	  this.$.insertAjax.url = "/api/HostPeople";
-      this.$.insertAjax.body = JSON.stringify({
-        "HostID": hostID,
-        "PersonID": personID,
-        "PersonType": personType,
-        "StartDate": startDate,
-        "EndDate": null
-      });
-      this.personID = personID;
-  	  this.hostID = hostID;
-  	  this.$.insertAjax.generateRequest();
+  	insert: function(personID, personType, startDate){
+		this.personID = personID;
+		this.personType = personType;
+		this.startDate = startDate;
+		
+		if(!this.isGroupExist){
+			this._insertGroup();
+			return;
+		}
+		this.$.insertAjax.url = "/api/GroupDetails";
+		this.$.insertAjax.body = JSON.stringify({
+			"GroupID": this.groupID,
+			"RelatedID": personID,
+			"PersonType": personType,
+			"StartDate": new Date(),
+			"EndDate": null
+		});		
+		this.$.insertAjax.generateRequest();
   	},
   	_handleAjaxInsert: function(){
   	  var _id = this.$.insertAjax.lastResponse.id;
   	  this.fire('hostperson-success', {'event':'insert','id':_id,'PersonID':this.personID,'HostID':this.hostID});
   	},
+	_insertGroup: function(){
+		this.$.insertGroup.url = "/api/Groups";
+		this.$.insertGroup.body = JSON.stringify({
+			"relationType": this.relationType,
+			"relationDesc": this.relationDesc,
+			"HostID": this.hostID			
+		});
+		this.$.insertGroup.generateRequest();
+	},
+	_handleInsertGroup: function(){
+		var response = this.$.insertGroup.lastResponse;
+		if(response){
+			if(response.length > 0){
+				this.groupID = response[0].id;
+				this.isGroupExist = true;
+				this.insert(this.personID, this.personType, this.startDate);
+			}
+		}
+	},
   	update: function(id, value){
   	  var body = JSON.stringify({
         "EndDate": new Date()
@@ -88,7 +155,7 @@
       if(value){
         body = JSON.stringify(value);
       }
-  	  this.$.updateAjax.url = "/api/HostPeople/" + id;
+  	  this.$.updateAjax.url = "/api/GroupDetails/" + id;
   	  this.$.updateAjax.body = body;
   	  this.id = id;
   	  this.$.updateAjax.generateRequest();
