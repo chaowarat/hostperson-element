@@ -81,19 +81,11 @@
 	},
   	checkExist: function(personID){
 		this.personID = personID;
-		if(!this.isGroupExist){
-			this._handleCheckExist();
-			return;
-		}
 		var where = {"where":{"and":[{"GroupID":this.groupID},{"EndDate":null},{"RelatedID":personID}]}};
 		this.$.checkExistAjax.url = "/api/GroupDetails/?filter=" + encodeURI(JSON.stringify(where));
 		this.$.checkExistAjax.generateRequest();
   	},
   	_handleCheckExist: function(){
-		if(!this.isGroupExist){
-			this.fire('hostperson-success', {'event':'checkExist','id':null,'PersonID':this.personID,'HostID':this.hostID});
-			return;
-		}
 		var response = this.$.checkExistAjax.lastResponse;
 		var _id = null;
 		if(response.length > 0){
@@ -113,17 +105,18 @@
 		
 		if(!this.isGroupExist){
 			this._insertGroup();
-			return;
 		}
-		this.$.insertAjax.url = "/api/GroupDetails";
-		this.$.insertAjax.body = JSON.stringify({
-			"GroupID": this.groupID,
-			"RelatedID": personID,
-			"PersonType": personType,
-			"StartDate": new Date(),
-			"EndDate": null
-		});		
-		this.$.insertAjax.generateRequest();
+		else{
+			this.$.insertAjax.url = "/api/GroupDetails";
+			this.$.insertAjax.body = JSON.stringify({
+				"GroupID": this.groupID,
+				"RelatedID": personID,
+				"PersonType": personType,
+				"StartDate": new Date(),
+				"EndDate": null
+			});		
+			this.$.insertAjax.generateRequest();
+		}
   	},
   	_handleAjaxInsert: function(){
   	  var _id = this.$.insertAjax.lastResponse.id;
